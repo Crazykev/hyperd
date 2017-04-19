@@ -132,7 +132,7 @@ func (s *ServerRPC) ExecVM(stream types.PublicAPI_ExecVMServer) error {
 
 	inReader, inWriter := io.Pipe()
 	outReader, outWriter := io.Pipe()
-	go func() {
+	waitErr := promise.Go(func() (err error) {
 		defer outReader.Close()
 		buf := make([]byte, 32)
 		for {
@@ -142,18 +142,18 @@ func (s *ServerRPC) ExecVM(stream types.PublicAPI_ExecVMServer) error {
 					Stdout: buf[:nr],
 				}); err != nil {
 					glog.Errorf("Send to stream error: %v", err)
-					return
+					return err
 				}
 			}
 			if err == io.EOF {
-				break
+				return nil
 			}
 			if err != nil {
 				glog.Errorf("Read from pipe error: %v", err)
-				return
+				return err
 			}
 		}
-	}()
+	})
 
 	go func() {
 		defer inWriter.Close()
@@ -191,5 +191,5 @@ func (s *ServerRPC) ExecVM(stream types.PublicAPI_ExecVMServer) error {
 		return err
 	}
 
-	return nil
+	return <-waitErr
 }
